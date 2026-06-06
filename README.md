@@ -47,7 +47,7 @@ Notes:
 | `list-zones` | — | List the display names of all primary DNS zones. |
 | `list-records` | `--zone <zone>` `[--separate]` `[--show-refs]` | List all DNS records of a zone, sorted by name. `--separate` prints each view in its own block; `--show-refs` appends the object **REF** and **ENABLED** (✅/❌) columns (SOA refs are blanked). |
 | `list-ranges` | `[--filter <filter>]` | List the IP ranges the API user may manage (default filter `type!=Container`). |
-| `list-ipaddrs` | `<net>` *or* `--net <net>` | List A records, DHCP reservations and leases whose IP starts with the given IPv4 prefix (e.g. `141.41.2.`), sorted by IP. |
+| `list-ipaddrs` | `<net>` *or* `--net <net>` | List A records, DHCP reservations and leases whose IP starts with the given IPv4 prefix (e.g. `192.168.2.`), sorted by IP. |
 | `search` | `--zone <zone>` `--name <name>` `[--show-refs]` | Search records by name prefix across all views of a zone. `--show-refs` appends the **REF** and **ENABLED** columns. |
 | `add-a` | `--zone <zone>` `--name <name>` `--ip <ipv4>` `--ttl <ttl>` | Add an A record to all refs (views) of a zone; prints the created object refs. |
 | `remove-a` | `--zone <zone>` `--name <name>` `[--dry]` | Remove the app's own (`l9g-cheese`-tagged) A records for a name. `--dry` previews only. |

@@ -47,7 +47,7 @@ Hinweise:
 | `list-zones` | — | Anzeigenamen aller primären DNS-Zonen auflisten. |
 | `list-records` | `--zone <zone>` `[--separate]` `[--show-refs]` | Alle DNS-Records einer Zone auflisten, nach Name sortiert. `--separate` gibt jede View als eigenen Block aus; `--show-refs` ergänzt die Spalten **REF** und **ENABLED** (✅/❌) (SOA-Refs werden leer ausgegeben). |
 | `list-ranges` | `[--filter <filter>]` | IP-Ranges auflisten, die der API-Benutzer verwalten darf (Standardfilter `type!=Container`). |
-| `list-ipaddrs` | `<net>` *oder* `--net <net>` | A-Records, DHCP-Reservierungen und Leases auflisten, deren IP mit dem IPv4-Präfix beginnt (z. B. `141.41.2.`), nach IP sortiert. |
+| `list-ipaddrs` | `<net>` *oder* `--net <net>` | A-Records, DHCP-Reservierungen und Leases auflisten, deren IP mit dem IPv4-Präfix beginnt (z. B. `192.168.2.`), nach IP sortiert. |
 | `search` | `--zone <zone>` `--name <name>` `[--show-refs]` | Records per Namenspräfix über alle Views einer Zone suchen. `--show-refs` ergänzt die Spalten **REF** und **ENABLED**. |
 | `add-a` | `--zone <zone>` `--name <name>` `--ip <ipv4>` `--ttl <ttl>` | Einen A-Record zu allen Refs (Views) einer Zone hinzufügen; gibt die erzeugten Objekt-Refs aus. |
 | `remove-a` | `--zone <zone>` `--name <name>` `[--dry]` | Die eigenen (mit `l9g-cheese` getaggten) A-Records eines Namens entfernen. `--dry` zeigt nur eine Vorschau. |
