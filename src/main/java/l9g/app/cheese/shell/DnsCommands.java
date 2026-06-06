@@ -31,6 +31,12 @@ import org.springframework.shell.core.command.annotation.Option;
 import org.springframework.stereotype.Component;
 
 /**
+ * Spring Shell commands in the {@code "DNS Commands"} group for real DNS
+ * resolution.
+ *
+ * <p>Unlike the {@code "Micetro Commands"}, this group queries the actual DNS
+ * system (via JNDI's {@code com.sun.jndi.dns.DnsContextFactory}), not the
+ * Micetro IPAM server — useful for verifying what is actually published.
  *
  * @author Thorsten Ludewig (t.ludewig@gmail.com)
  */
@@ -43,6 +49,20 @@ public class DnsCommands
     "A", "AAAA", "CNAME", "MX", "TXT", "NS"
   };
 
+  /**
+   * {@code lookup} command: resolves a fully qualified domain name via JNDI DNS
+   * and prints the {@link #RECORD_TYPES} records found, one
+   * {@code <type>  <value>} per line. The FQDN may be given positionally or via
+   * {@code --fqdn}; the named option wins if both are present.
+   *
+   * @param fqdnOption the FQDN to resolve ({@code --fqdn}, optional; e.g.
+   *                   {@code www.example.de})
+   * @param fqdnArg    the positional FQDN (index 0, optional alternative to
+   *                   {@code --fqdn}, default {@code ""})
+   * @return the resolved records, a usage message if no FQDN was given, a
+   *         "not found"/"no records" message, or an error message if the lookup
+   *         failed
+   */
   @Command(name = "lookup",
            group = "DNS Commands",
            description = "Resolve a FQDN via DNS and print the records found")

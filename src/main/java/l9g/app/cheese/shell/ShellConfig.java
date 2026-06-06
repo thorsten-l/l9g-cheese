@@ -22,6 +22,11 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.shell.jline.PromptProvider;
 
 /**
+ * Spring configuration for the interactive JLine shell.
+ *
+ * <p>Currently it customizes the interactive prompt by providing a
+ * {@link PromptProvider} bean that replaces Spring Shell's default
+ * {@code "shell:>"} with the styled {@code "cheese:> "} prompt.
  *
  * @author Thorsten Ludewig (t.ludewig@gmail.com)
  */

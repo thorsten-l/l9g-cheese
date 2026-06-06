@@ -16,8 +16,23 @@
 package l9g.app.cheese.jsonrpc;
 
 /**
+ * Immutable DTO representing a JSON-RPC 2.0 response envelope.
+ * <p>
+ * It carries the protocol version, the {@code id} echoed back from the matching
+ * {@link JsonRpcRequest}, and exactly one of either a successful {@code result}
+ * or an {@link JsonRpcError}. The response is generic in the type of the
+ * {@code result} payload.
  *
  * @author Thorsten Ludewig (t.ludewig@gmail.com)
+ *
+ * @param <T>     the type of the successful result payload
+ *
+ * @param jsonrpc the JSON-RPC protocol version; always {@code "2.0"}
+ * @param id      the request identifier echoed back from the originating request
+ * @param result  the result payload on success; {@code null} when an
+ *                {@code error} is present
+ * @param error   the error details on failure; {@code null} when a
+ *                {@code result} is present
  */
 public record JsonRpcResponse<T>(
   String jsonrpc, int id, T result, JsonRpcError error)

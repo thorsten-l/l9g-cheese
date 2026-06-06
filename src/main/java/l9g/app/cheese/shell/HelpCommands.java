@@ -66,11 +66,33 @@ public class HelpCommands
   // for commands whose @Command method has an @Argument parameter. Built lazily.
   private Map<String, String> positionalLabels;
 
+  /**
+   * Creates the help command holder.
+   *
+   * @param applicationContext the Spring context, scanned reflectively for
+   *                          {@code @Command} beans to discover positional
+   *                          {@code @Argument} labels (see
+   *                          {@link #positionalLabels()})
+   */
   public HelpCommands(ApplicationContext applicationContext)
   {
     this.applicationContext = applicationContext;
   }
 
+  /**
+   * {@code help} command: shows an overview of all visible commands grouped by
+   * their {@code @Command} group, or — when a command name is given — the
+   * NAME / SYNOPSIS / OPTIONS detail page for that single command (without the
+   * dead {@code --help}/{@code -h} lines the built-in renderer would add).
+   *
+   * @param ctx     the auto-injected command context; the
+   *                {@link CommandRegistry} is read from it at execution time
+   *                rather than injected (see the class Javadoc)
+   * @param command the command to show detail for (positional index 0,
+   *                optional, default {@code ""}); blank shows the overview
+   * @return the rendered overview or per-command detail text, or an "unknown
+   *         command" message
+   */
   @Command(name = "help",
            group = "Built-In Commands",
            description = "Show help about available commands")
@@ -92,6 +114,14 @@ public class HelpCommands
   /////////////////////////////////////////////////////////////////////////////
   // overview: all visible commands grouped by their @Command group
 
+  /**
+   * Renders the overview page: every non-hidden command grouped by its
+   * {@code @Command} group, with groups and commands sorted alphabetically and
+   * each command line showing its name (plus aliases) and description.
+   *
+   * @param commandRegistry the registry of all registered commands
+   * @return the formatted overview text (trailing whitespace stripped)
+   */
   private String overview(CommandRegistry commandRegistry)
   {
     // group name -> (command name -> description), both kept sorted
@@ -132,6 +162,17 @@ public class HelpCommands
   /////////////////////////////////////////////////////////////////////////////
   // detail: NAME / SYNOPSIS / OPTIONS for one command (no --help/-h lines)
 
+  /**
+   * Renders the NAME / SYNOPSIS / OPTIONS detail page for a single command,
+   * looked up by name or alias. The synthetic {@code help}/{@code -h} option is
+   * filtered out, and commands that also accept their value positionally show it
+   * first in the synopsis (e.g. {@code lookup [<fqdn>] --fqdn String}).
+   *
+   * @param commandRegistry the registry of all registered commands
+   * @param name            the command name or alias to describe
+   * @return the formatted detail page, or an "unknown command" message when the
+   *         name resolves to nothing
+   */
   private String detail(CommandRegistry commandRegistry, String name)
   {
     org.springframework.shell.core.command.Command c =
@@ -257,6 +298,14 @@ public class HelpCommands
     return positionalLabels;
   }
 
+  /**
+   * Formats a single option for the SYNOPSIS line, following the standard CLI
+   * convention: optional options are wrapped in {@code [ ]}, mandatory ones are
+   * shown bare (e.g. {@code --zone String} or {@code [--dry boolean]}).
+   *
+   * @param o the command option to format
+   * @return the synopsis fragment for the option
+   */
   // Standard CLI convention: optional options are wrapped in [ ], mandatory
   // ones are shown bare.
   private static String synopsisOption(CommandOption o)
@@ -266,6 +315,15 @@ public class HelpCommands
     return isRequired(o) ? body : "[" + body + "]";
   }
 
+  /**
+   * Formats the constraint annotation shown beneath an option in the OPTIONS
+   * section: {@code [Mandatory]} for required options, otherwise
+   * {@code [Optional, default = ...]} when a non-blank default exists, or plain
+   * {@code [Optional]}.
+   *
+   * @param o the command option
+   * @return the constraint label
+   */
   private static String constraint(CommandOption o)
   {
     if(isRequired(o))
@@ -280,6 +338,13 @@ public class HelpCommands
     return "[Optional]";
   }
 
+  /**
+   * Reports whether an option is mandatory, treating a {@code null}
+   * {@code required} flag as not required.
+   *
+   * @param o the command option
+   * @return {@code true} if the option is required
+   */
   private static boolean isRequired(CommandOption o)
   {
     return Boolean.TRUE.equals(o.required());

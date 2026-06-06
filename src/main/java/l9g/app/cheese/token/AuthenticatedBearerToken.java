@@ -21,6 +21,17 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
 
 /**
+ * Marker annotation for a controller-handler method parameter that should be
+ * resolved to the authenticated caller's
+ * {@link BearerTokenConfig.BearerToken}.
+ * <p>
+ * Parameters annotated with {@code @AuthenticatedBearerToken} are populated by
+ * {@link BearerTokenArgumentResolver}, which maps the current request's
+ * {@link java.security.Principal} name to a configured bearer token.
+ * <p>
+ * The annotation targets method parameters ({@link ElementType#PARAMETER}) and
+ * is retained at runtime ({@link RetentionPolicy#RUNTIME}) so the argument
+ * resolver can detect it via reflection.
  *
  * @author Thorsten Ludewig (t.ludewig@gmail.com)
  */

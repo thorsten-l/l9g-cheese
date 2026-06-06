@@ -16,13 +16,34 @@
 package l9g.app.cheese.jsonrpc;
 
 /**
+ * Immutable DTO representing a JSON-RPC 2.0 request envelope.
+ * <p>
+ * It carries the protocol version, the remote {@code method} to invoke, the
+ * {@code params} passed to that method, and a client-assigned {@code id} used to
+ * correlate the matching {@link JsonRpcResponse}.
  *
  * @author Thorsten Ludewig (t.ludewig@gmail.com)
+ *
+ * @param jsonrpc the JSON-RPC protocol version; always {@code "2.0"}
+ * @param method  the name of the remote method to be invoked
+ * @param params  the parameter values for the invoked method; may be {@code null}
+ * @param id      the client-assigned request identifier used to correlate the
+ *                response
  */
 public record JsonRpcRequest(
   String jsonrpc, String method, Object params, int id)
   {
 
+  /**
+   * Convenience constructor that builds a request with the JSON-RPC protocol
+   * version defaulted to {@code "2.0"}.
+   *
+   * @param method the name of the remote method to be invoked
+   * @param params the parameter values for the invoked method; may be
+   *               {@code null}
+   * @param id     the client-assigned request identifier used to correlate the
+   *               response
+   */
   public JsonRpcRequest(String method, Object params, int id)
   {
     this("2.0", method, params, id);

@@ -25,6 +25,14 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
 /**
+ * Spring MVC {@link HandlerMethodArgumentResolver} that resolves controller
+ * parameters annotated with {@link AuthenticatedBearerToken} into the
+ * {@link BearerToken} of the authenticated caller.
+ * <p>
+ * It looks up the current request's {@link Principal} and uses its name as the
+ * key into the {@link BearerTokenConfig} map to locate the matching configured
+ * token. If no principal is present, or no token is configured for the
+ * principal's name, a {@link MissingOrInvalidTokenException} is thrown.
  *
  * @author Thorsten Ludewig (t.ludewig@gmail.com)
  */
@@ -35,11 +43,25 @@ public class BearerTokenArgumentResolver implements
 
   private final BearerTokenConfig tokenConfig;
 
+  /**
+   * Creates a resolver backed by the given bearer-token configuration.
+   *
+   * @param tokenConfig the configuration holding the map of configured bearer
+   *                    tokens used to resolve the authenticated caller
+   */
   public BearerTokenArgumentResolver(BearerTokenConfig tokenConfig)
   {
     this.tokenConfig = tokenConfig;
   }
 
+  /**
+   * Indicates whether this resolver can handle the given method parameter.
+   *
+   * @param parameter the method parameter to inspect
+   * @return {@code true} if the parameter is annotated with
+   *         {@link AuthenticatedBearerToken} and its type is assignable to
+   *         {@link BearerToken}; {@code false} otherwise
+   */
   @Override
   public boolean supportsParameter(MethodParameter parameter)
   {
@@ -47,6 +69,23 @@ public class BearerTokenArgumentResolver implements
       && BearerToken.class.isAssignableFrom(parameter.getParameterType());
   }
 
+  /**
+   * Resolves the annotated parameter to the {@link BearerToken} of the
+   * authenticated caller.
+   * <p>
+   * The current request's {@link Principal} name is used as the lookup key into
+   * the configured token map.
+   *
+   * @param parameter     the method parameter being resolved
+   * @param mavContainer  the model-and-view container for the current request
+   * @param webRequest    the current web request, used to obtain the user
+   *                      principal
+   * @param binderFactory the factory for creating data binders; not used here
+   * @return the {@link BearerToken} configured for the authenticated principal
+   * @throws MissingOrInvalidTokenException if there is no authenticated
+   *                                        principal, or no token is configured
+   *                                        for the principal's name
+   */
   @Override
   public Object resolveArgument(
     MethodParameter parameter,

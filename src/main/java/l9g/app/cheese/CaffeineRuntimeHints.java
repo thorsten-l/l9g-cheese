@@ -37,6 +37,18 @@ public class CaffeineRuntimeHints implements RuntimeHintsRegistrar
     "com.github.benmanes.caffeine.cache.PSW"
   };
 
+  /**
+   * Registers reflection hints for Caffeine's reflectively-loaded cache and node
+   * classes so they remain reachable in the GraalVM native image. For each class
+   * in {@link #CACHE_CLASSES}, both declared field access and declared
+   * constructors are registered, because Caffeine reads the static
+   * {@code FACTORY} field and instantiates the class via reflection.
+   *
+   * @param hints       the {@link RuntimeHints} instance to contribute reflection
+   *                    hints to
+   * @param classLoader the {@link ClassLoader} to use when resolving the hinted
+   *                    types (unused here; types are referenced by name)
+   */
   @Override
   public void registerHints(RuntimeHints hints, ClassLoader classLoader)
   {

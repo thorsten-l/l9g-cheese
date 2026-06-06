@@ -16,11 +16,23 @@
 package l9g.app.cheese.token;
 
 /**
+ * Unchecked exception signalling that a request carried no bearer token, or a
+ * token that does not correspond to any configured
+ * {@link BearerTokenConfig.BearerToken}.
+ * <p>
+ * It is thrown by {@link BearerTokenArgumentResolver} when the authenticated
+ * principal is absent (anonymous) or cannot be matched to a configured token.
  *
  * @author Thorsten Ludewig (t.ludewig@gmail.com)
  */
 public class MissingOrInvalidTokenException extends RuntimeException {
   private static final long serialVersionUID = -7715861645594874965L;
+    /**
+     * Creates the exception with a message identifying the offending principal.
+     *
+     * @param principal the name of the principal whose token was missing or
+     *                  invalid (for example {@code "anonymous"})
+     */
     public MissingOrInvalidTokenException(String principal) {
         super("Missing or invalid token for principal: " + principal);
     }

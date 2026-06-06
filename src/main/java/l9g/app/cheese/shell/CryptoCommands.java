@@ -22,6 +22,14 @@ import org.springframework.shell.core.command.annotation.Option;
 import org.springframework.stereotype.Component;
 
 /**
+ * Spring Shell commands in the {@code "Crypto Commands"} group for the app's
+ * AES-256 property encryption.
+ *
+ * <p>Encrypted property values are stored in config prefixed with
+ * {@code {AES256}} and decrypted at startup by the {@code crypto-spring}
+ * {@code EnvironmentPostProcessor}. This command lets an operator produce such a
+ * cipher string for a clear-text value using the same {@link CryptoHandler}
+ * (and thus the same secret key).
  *
  * @author Thorsten Ludewig (t.ludewig@gmail.com)
  */
@@ -29,6 +37,15 @@ import org.springframework.stereotype.Component;
 @Component
 public class CryptoCommands
 {
+  /**
+   * {@code encrypt} command: encrypts a clear-text value into a
+   * {@code {AES256}...} cipher string suitable for use in the app's
+   * configuration files.
+   *
+   * @param text the clear text to encrypt ({@code --text}, required)
+   * @return a line of the form {@code "<text>" = "<cipher>"} pairing the input
+   *         with its encrypted form
+   */
   @Command(name = "encrypt",
            group = "Crypto Commands",
            description = "Encrypt a clear text value into a {AES256}... cipher string")

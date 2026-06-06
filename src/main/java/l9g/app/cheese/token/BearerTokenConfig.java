@@ -36,22 +36,51 @@ import org.springframework.context.annotation.Configuration;
 @ToString
 public class BearerTokenConfig
 {
+  /**
+   * The configured bearer tokens, keyed by an arbitrary identifier (the
+   * configuration map key). Each entry describes a single token and its
+   * authorization scope.
+   */
   private Map<String,BearerToken> map;
-  
+
+  /**
+   * A single configured bearer token together with its owner metadata and the
+   * authorization scope (zones and FQDNs) it is permitted to act upon.
+   */
   @Data
   @ToString
   public static class BearerToken
   {
+    /**
+     * The secret bearer token value used to authenticate a request.
+     */
     private String token;
 
+    /**
+     * The owner this token belongs to, for identification and auditing.
+     */
     private String owner;
-   
+
+    /**
+     * A free-form, human-readable description of the token's purpose.
+     */
     private String description;
-        
+
+    /**
+     * The DNS zones this token is permitted to operate on; mutating operations
+     * are authorized only for zones listed here.
+     */
     private List<String> permittedZones;
-    
+
+    /**
+     * The fully-qualified domain names this token is permitted to operate on.
+     */
     private List<String> permittedFqdns;
 
+    /**
+     * Whether this token is active; disabled tokens ({@code false}) must not be
+     * accepted. Defaults to {@code false}.
+     */
     private boolean enabled = false;
   }
 }
