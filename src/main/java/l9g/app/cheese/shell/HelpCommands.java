@@ -15,15 +15,21 @@
  */
 package l9g.app.cheese.shell;
 
+import java.lang.reflect.Method;
+import java.lang.reflect.Parameter;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.aop.support.AopUtils;
+import org.springframework.context.ApplicationContext;
 import org.springframework.shell.core.command.CommandContext;
 import org.springframework.shell.core.command.CommandOption;
 import org.springframework.shell.core.command.CommandRegistry;
 import org.springframework.shell.core.command.annotation.Argument;
 import org.springframework.shell.core.command.annotation.Command;
+import org.springframework.shell.core.command.annotation.Option;
 import org.springframework.stereotype.Component;
 
 /**
@@ -54,6 +60,17 @@ import org.springframework.stereotype.Component;
 @Component
 public class HelpCommands
 {
+  private final ApplicationContext applicationContext;
+
+  // command name -> positional argument label (the related option's longName),
+  // for commands whose @Command method has an @Argument parameter. Built lazily.
+  private Map<String, String> positionalLabels;
+
+  public HelpCommands(ApplicationContext applicationContext)
+  {
+    this.applicationContext = applicationContext;
+  }
+
   @Command(name = "help",
            group = "Built-In Commands",
            description = "Show help about available commands")
@@ -147,6 +164,13 @@ public class HelpCommands
 
     sb.append("SYNOPSIS").append(System.lineSeparator());
     sb.append('\t').append(c.getName());
+    // commands that also accept their value positionally (see DnsCommands /
+    // ZoneCommands) show it first, e.g. "lookup [<fqdn>] --fqdn String"
+    String positional = positionalLabels().get(c.getName());
+    if(positional != null)
+    {
+      sb.append(" [<").append(positional).append(">]");
+    }
     for(CommandOption o : options)
     {
       sb.append(' ').append(synopsisOption(o));
@@ -176,13 +200,70 @@ public class HelpCommands
     return sb.toString().stripTrailing();
   }
 
-  // Mandatory options are wrapped in [ ] in the synopsis, matching the built-in
-  // renderer's (slightly unusual) convention; optional ones are bare.
+  /**
+   * Scan our {@code @Command} beans for methods that declare an {@code @Argument}
+   * parameter (i.e. accept their value positionally) and map the command name to
+   * a label taken from the method's first {@code @Option} (e.g. {@code fqdn}).
+   * The registered {@code Command} objects do not expose {@code @Argument}
+   * metadata, so this reads it from the source methods reflectively. Computed
+   * once and cached; failures degrade to "no positional hint".
+   */
+  private synchronized Map<String, String> positionalLabels()
+  {
+    if(positionalLabels != null)
+    {
+      return positionalLabels;
+    }
+    Map<String, String> labels = new HashMap<>();
+    try
+    {
+      for(Object bean
+        : applicationContext.getBeansWithAnnotation(Component.class).values())
+      {
+        for(Method method : AopUtils.getTargetClass(bean).getDeclaredMethods())
+        {
+          Command command = method.getAnnotation(Command.class);
+          if(command == null)
+          {
+            continue;
+          }
+          boolean hasArgument = false;
+          String optionLabel = null;
+          for(Parameter parameter : method.getParameters())
+          {
+            if(parameter.isAnnotationPresent(Argument.class))
+            {
+              hasArgument = true;
+            }
+            Option option = parameter.getAnnotation(Option.class);
+            if(option != null && optionLabel == null)
+            {
+              optionLabel = option.longName();
+            }
+          }
+          if(hasArgument && command.name().length > 0)
+          {
+            labels.put(command.name()[0],
+              optionLabel != null ? optionLabel : "arg");
+          }
+        }
+      }
+    }
+    catch(RuntimeException e)
+    {
+      log.debug("positional-argument scan failed", e);
+    }
+    positionalLabels = labels;
+    return positionalLabels;
+  }
+
+  // Standard CLI convention: optional options are wrapped in [ ], mandatory
+  // ones are shown bare.
   private static String synopsisOption(CommandOption o)
   {
     String body = "--" + o.longName()
       + (o.type() != null ? " " + o.type().getSimpleName() : "");
-    return isRequired(o) ? "[" + body + "]" : body;
+    return isRequired(o) ? body : "[" + body + "]";
   }
 
   private static String constraint(CommandOption o)

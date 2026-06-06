@@ -164,14 +164,18 @@ public class MicetroService
     return result;
   }
 
-  private void addDnsRecord(
+  private String addDnsRecord(
     String session, String dnsZoneRef, String type, String name,
     String data, String ttl)
   {
     Map<String, Object> dnsRecord = new LinkedHashMap<>();
     dnsRecord.put("name", name);
     dnsRecord.put("type", type);
-    dnsRecord.put("ttl", ttl);
+    // an empty/absent ttl lets Micetro apply the zone's default TTL
+    if(ttl != null && !ttl.isBlank())
+    {
+      dnsRecord.put("ttl", ttl);
+    }
     dnsRecord.put("data", data);
     dnsRecord.put("comment", COMMENT_TAG);
     dnsRecord.put("enabled", true);
@@ -187,6 +191,8 @@ public class MicetroService
       "AddDNSRecord", params);
 
     log.debug("{}", response);
+    // AddDNSRecord returns the ref of the newly created record
+    return response != null ? (String)response.get("ref") : null;
   }
 
   private void addTxtDnsRecord(String session, String dnsZoneRef, String name, String data)
@@ -213,7 +219,63 @@ public class MicetroService
     return list != null ? list : List.of();
   }
 
-  private void removeObjects(String session, List<String> objRefs)
+  /**
+   * Remove Micetro objects by their raw references (e.g. DNS record refs
+   * obtained via {@code search --show-refs}). This bypasses the
+   * {@code COMMENT_TAG} guard that {@code remove-a} / {@code remove-txt} apply,
+   * so it can delete any object the API user may delete — use with care.
+   * Throws {@link MicetroApiException} if Micetro rejects the call outright.
+   *
+   * @return the per-ref errors Micetro reported (empty = all removed). Micetro's
+   *         {@code RemoveObjects} returns an {@code errors} array rather than
+   *         throwing for individual refs.
+   */
+  public List<Object> removeObjectsByRefs(List<String> objRefs)
+  {
+    log.debug("REMOVE OBJECTS: refs={}", objRefs);
+    LinkedHashMap<String, Object> response = removeObjects(login(), objRefs);
+    List<Object> errors = (List<Object>)response.get("errors");
+    return errors != null ? errors : List.of();
+  }
+
+  /**
+   * Enable or disable Micetro objects by their refs via {@code SetProperties}
+   * ({@code properties: {enabled: true|false}}). Each ref is a separate call;
+   * a per-ref {@link MicetroApiException} is collected rather than aborting.
+   *
+   * @return one error message per ref that failed (empty = all succeeded)
+   */
+  public List<String> setObjectsEnabled(List<String> objRefs, boolean enabled)
+  {
+    log.debug("SET ENABLED={}: refs={}", enabled, objRefs);
+    String session = login();
+    List<String> errors = new ArrayList<>();
+    for(String ref : objRefs)
+    {
+      try
+      {
+        Map<String, Object> properties = new LinkedHashMap<>();
+        properties.put("enabled", enabled);
+
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put("ref", ref);
+        params.put("properties", properties);
+        params.put("saveComment", "");
+        params.put("session", session);
+
+        client.call("SetProperties", params);
+      }
+      catch(MicetroApiException e)
+      {
+        log.warn("SetProperties failed for ref {}: {}", ref, e.getMessage());
+        errors.add(ref + ": " + e.getMessage());
+      }
+    }
+    return errors;
+  }
+
+  private LinkedHashMap<String, Object> removeObjects(
+    String session, List<String> objRefs)
   {
     Map<String, Object> params = new LinkedHashMap<>();
     params.put("objRefs", objRefs);
@@ -224,6 +286,7 @@ public class MicetroService
       "RemoveObjects", params);
 
     log.debug("{}", response);
+    return response;
   }
 
   /////////////////////////////////////////////////////////////////////////////
@@ -247,7 +310,7 @@ public class MicetroService
     log.debug("zoneRefs={}", zoneRefs);
     if(zoneRefs == null)
     {
-      return new AddResult(0, List.of());
+      return new AddResult(0, List.of(), List.of());
     }
     int succeeded = 0;
     List<String> errors = new ArrayList<>();
@@ -264,35 +327,52 @@ public class MicetroService
         errors.add(ref + ": " + e.getMessage());
       }
     }
-    return new AddResult(succeeded, errors);
+    return new AddResult(succeeded, errors, List.of());
   }
 
   public AddResult addARecords(String zone, String name, String ip, String ttl)
   {
-    log.debug("ADD A: zone={}, name={}, ip={}", zone, name, ip);
+    return addRecords(zone, "A", name, ip, ttl);
+  }
+
+  /**
+   * Add a DNS record of an arbitrary type to every ref of a zone (e.g. the
+   * internal and external views). A blank {@code ttl} lets Micetro apply the
+   * zone default. Records are tagged with {@code COMMENT_TAG} like all records
+   * this app creates.
+   */
+  public AddResult addRecords(
+    String zone, String type, String name, String data, String ttl)
+  {
+    log.debug("ADD {}: zone={}, name={}, data={}", type, zone, name, data);
     String session = login();
     List<String> zoneRefs = findZoneRefs(zone, session);
     log.debug("zoneRefs={}", zoneRefs);
     if(zoneRefs == null)
     {
-      return new AddResult(0, List.of());
+      return new AddResult(0, List.of(), List.of());
     }
     int succeeded = 0;
     List<String> errors = new ArrayList<>();
+    List<String> refs = new ArrayList<>();
     for(String ref : zoneRefs)
     {
       try
       {
-        addDnsRecord(session, ref, "A", name, ip, ttl);
+        String created = addDnsRecord(session, ref, type, name, data, ttl);
+        if(created != null)
+        {
+          refs.add(created);
+        }
         succeeded++;
       }
       catch(MicetroApiException e)
       {
-        log.warn("add A failed for ref {}: {}", ref, e.getMessage());
+        log.warn("add {} failed for ref {}: {}", type, ref, e.getMessage());
         errors.add(ref + ": " + e.getMessage());
       }
     }
-    return new AddResult(succeeded, errors);
+    return new AddResult(succeeded, errors, refs);
   }
 
   public List<String> dryRunRemoveARecords(String zone, String name)
@@ -907,9 +987,11 @@ public class MicetroService
    * Outcome of an add operation that spans multiple zone refs (e.g. internal
    * and external views). {@code succeeded} counts the refs the record was
    * created in; {@code errors} holds one message per ref that rejected it
-   * (e.g. a view where the IP is outside the assigned range).
+   * (e.g. a view where the IP is outside the assigned range); {@code refs} holds
+   * the object references of the records actually created (from AddDNSRecord).
    */
-  public static record AddResult(int succeeded, List<String> errors)
+  public static record AddResult(
+    int succeeded, List<String> errors, List<String> refs)
   {
   }
 

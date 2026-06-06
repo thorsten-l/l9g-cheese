@@ -25,6 +25,7 @@ import javax.naming.directory.Attributes;
 import javax.naming.directory.DirContext;
 import javax.naming.directory.InitialDirContext;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.shell.core.command.annotation.Argument;
 import org.springframework.shell.core.command.annotation.Command;
 import org.springframework.shell.core.command.annotation.Option;
 import org.springframework.stereotype.Component;
@@ -48,9 +49,21 @@ public class DnsCommands
   public String lookup(
     @Option(longName = "fqdn",
             description = "Fully qualified domain name to resolve (e.g. www.example.de)",
-            required = true) String fqdn)
+            required = false) String fqdnOption,
+    @Argument(index = 0,
+              description = "FQDN to resolve (positional alternative to --fqdn)",
+              defaultValue = "") String fqdnArg)
   {
+    // accept either "lookup www.example.de" (positional) or
+    // "lookup --fqdn www.example.de"; the named option wins if both are given.
+    String fqdn = (fqdnOption != null && !fqdnOption.isBlank())
+      ? fqdnOption : fqdnArg;
     log.debug("lookup: fqdn={}", fqdn);
+
+    if(fqdn == null || fqdn.isBlank())
+    {
+      return "Missing FQDN. Usage: lookup <fqdn>  (or: lookup --fqdn <fqdn>)";
+    }
 
     Hashtable<String, Object> env = new Hashtable<>();
     env.put(Context.INITIAL_CONTEXT_FACTORY,

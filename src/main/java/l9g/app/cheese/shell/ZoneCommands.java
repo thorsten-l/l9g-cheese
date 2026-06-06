@@ -19,11 +19,14 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import l9g.app.cheese.micetro.MicetroApiException;
 import l9g.app.cheese.micetro.MicetroService;
 import l9g.app.cheese.micetro.MicetroService.AddResult;
 import org.jline.utils.AttributedStringBuilder;
 import org.jline.utils.AttributedStyle;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.shell.core.command.CommandContext;
+import org.springframework.shell.core.command.annotation.Argument;
 import org.springframework.shell.core.command.annotation.Command;
 import org.springframework.shell.core.command.annotation.Option;
 import org.springframework.stereotype.Component;
@@ -52,10 +55,14 @@ public class ZoneCommands
             required = true) String zone,
     @Option(longName = "separate",
             description = "Output each matching zone (view) in its own block",
-            defaultValue = "false") boolean separate)
+            defaultValue = "false") boolean separate,
+    @Option(longName = "show-refs",
+            description = "Also show each record's object reference and enabled state",
+            defaultValue = "false") boolean showRefs)
   {
     zone = normalizeZone(zone);
-    log.debug("list-records: zone={}, separate={}", zone, separate);
+    log.debug("list-records: zone={}, separate={}, showRefs={}",
+      zone, separate, showRefs);
     List<Map<String, Object>> records = micetroService.listZoneRecords(zone);
 
     if(records.isEmpty())
@@ -65,7 +72,7 @@ public class ZoneCommands
 
     if( ! separate)
     {
-      return renderRecordTable(records, true);
+      return renderRecordTable(records, true, showRefs);
     }
 
     // group by zone displayName (records are already name-sorted, so each group
@@ -86,7 +93,7 @@ public class ZoneCommands
       }
       sb.append("=== ").append(group.getKey()).append(" ===")
         .append(System.lineSeparator());
-      sb.append(renderRecordTable(group.getValue(), false));
+      sb.append(renderRecordTable(group.getValue(), false, showRefs));
     }
     return sb.toString();
   }
@@ -100,10 +107,13 @@ public class ZoneCommands
             required = true) String zone,
     @Option(longName = "name",
             description = "Record name to match",
-            required = true) String name)
+            required = true) String name,
+    @Option(longName = "show-refs",
+            description = "Also show each record's object reference (for remove-object)",
+            defaultValue = "false") boolean showRefs)
   {
     zone = normalizeZone(zone);
-    log.debug("search: zone={}, name={}", zone, name);
+    log.debug("search: zone={}, name={}, showRefs={}", zone, name, showRefs);
     List<Map<String, Object>> records = micetroService.searchRecords(zone, name);
 
     if(records.isEmpty())
@@ -111,13 +121,17 @@ public class ZoneCommands
       return "No records found for name '" + name + "' in zone " + zone;
     }
 
-    return renderRecordTable(records, true);
+    return renderRecordTable(records, true, showRefs);
   }
 
   /////////////////////////////////////////////////////////////////////////////
   // table rendering for DNS record listings (search / range / list-records)
 
   private static final int MAX_CELL_WIDTH = 60;
+
+  private static final String ENABLED_CHECK = "✅";
+
+  private static final String ENABLED_CROSS = "❌";
 
   private static String cell(Object value)
   {
@@ -137,44 +151,78 @@ public class ZoneCommands
   private static String renderRecordTable(
     List<Map<String, Object>> records, boolean withZone)
   {
-    String[] headers = withZone
-      ? new String[]
-      {
-        "NAME", "TYPE", "DATA", "TTL", "COMMENT", "ZONE"
-      }
-      : new String[]
-      {
-        "NAME", "TYPE", "DATA", "TTL", "COMMENT"
-      };
+    return renderRecordTable(records, withZone, false);
+  }
+
+  private static String renderRecordTable(
+    List<Map<String, Object>> records, boolean withZone, boolean withRef)
+  {
+    List<String> headerList = new ArrayList<>(
+      List.of("NAME", "TYPE", "DATA", "TTL", "COMMENT"));
+    if(withZone)
+    {
+      headerList.add("ZONE");
+    }
+    int statusColumn = -1;
+    if(withRef)
+    {
+      headerList.add("REF");
+      headerList.add("ENABLED");
+      statusColumn = headerList.size() - 1;
+    }
+    String[] headers = headerList.toArray(new String[0]);
 
     List<String[]> rows = new ArrayList<>();
     for(Map<String, Object> r : records)
     {
-      String[] row = new String[headers.length];
-      row[0] = cell(r.get("name"));
-      row[1] = cell(r.get("type"));
-      row[2] = cell(r.get("data"));
-      row[3] = cell(r.get("ttl"));
-      row[4] = cell(r.get("comment"));
+      List<String> row = new ArrayList<>(List.of(
+        cell(r.get("name")), cell(r.get("type")), cell(r.get("data")),
+        cell(r.get("ttl")), cell(r.get("comment"))));
       if(withZone)
       {
-        row[5] = cell(r.get("displayName"));
+        row.add(cell(r.get("displayName")));
       }
-      rows.add(row);
+      if(withRef)
+      {
+        // blank the SOA ref so it can't be fed to remove-objects by accident
+        boolean soa = "SOA".equalsIgnoreCase(String.valueOf(r.get("type")));
+        row.add(soa ? "" : cell(r.get("ref")));
+        row.add(isEnabled(r) ? ENABLED_CHECK : ENABLED_CROSS);
+      }
+      rows.add(row.toArray(new String[0]));
     }
 
-    // the TYPE column (index 1) gets a per-type background colour
-    return renderStripedTable(headers, rows, 1);
+    // TYPE column (index 1) -> per-type background; statusColumn -> green/red glyph
+    return renderStripedTable(headers, rows, 1, statusColumn);
+  }
+
+  private static boolean isEnabled(Map<String, Object> record)
+  {
+    Object enabled = record.get("enabled");
+    if(enabled instanceof Boolean b)
+    {
+      return b;
+    }
+    // absent -> treat as enabled (records are enabled unless explicitly disabled)
+    return enabled == null || Boolean.parseBoolean(String.valueOf(enabled));
+  }
+
+  private static String renderStripedTable(
+    String[] headers, List<String[]> rows, int typeColumn)
+  {
+    return renderStripedTable(headers, rows, typeColumn, -1);
   }
 
   /**
    * Render a zebra-striped table: bold headers, alternating light-grey row
    * backgrounds with black text. When {@code typeColumn >= 0}, that column is
    * tinted per {@link #typeBackground} (used by the DNS record tables); pass
-   * {@code -1} for a plain striped table (list-zones / list-ranges).
+   * {@code -1} for a plain striped table (list-zones / list-ranges). When
+   * {@code statusColumn >= 0}, that column's {@code ✓}/{@code ✗} glyph is
+   * coloured green/red (used by the ENABLED column of search --show-refs).
    */
   private static String renderStripedTable(
-    String[] headers, List<String[]> rows, int typeColumn)
+    String[] headers, List<String[]> rows, int typeColumn, int statusColumn)
   {
     int[] width = new int[headers.length];
     for(int i = 0; i < headers.length; i++)
@@ -222,6 +270,12 @@ public class ZoneCommands
               .foreground(AttributedStyle.BLACK).background(typeBg);
           }
         }
+        else if(i == statusColumn)
+        {
+          int fg = ENABLED_CROSS.equals(row[i])
+            ? AttributedStyle.RED : AttributedStyle.GREEN;
+          cellStyle = AttributedStyle.DEFAULT.foreground(fg).background(zebra);
+        }
         asb.style(cellStyle).append(pad(row[i], width[i]));
         if(i < row.length - 1)
         {
@@ -268,6 +322,14 @@ public class ZoneCommands
         159;   // light cyan
       case "SRV" ->
         189;   // lavender
+      case "SVCB" ->
+        158;   // mint
+      case "HTTPS" ->
+        195;   // pale cyan
+      case "TLSA" ->
+        219;   // light magenta
+      case "SSHFP" ->
+        186;   // light yellow-green
       case "RESV" ->
         216;   // light orange (DHCP reservation)
       case "LEASE" ->
@@ -283,9 +345,23 @@ public class ZoneCommands
   public String listIpaddrs(
     @Option(longName = "net",
             description = "IPv4 prefix the address must start with (e.g. 141.41.2.)",
-            required = true) String net)
+            required = false) String netOption,
+    @Argument(index = 0,
+              description = "Net prefix (positional alternative to --net)",
+              defaultValue = "") String netArg)
   {
+    // accept either "list-ipaddrs 141.41.2." (positional) or
+    // "list-ipaddrs --net 141.41.2."; the named option wins if both are given.
+    String net = (netOption != null && !netOption.isBlank())
+      ? netOption : netArg;
     log.debug("list-ipaddrs: net={}", net);
+
+    if(net == null || net.isBlank())
+    {
+      return "Missing net prefix. Usage: list-ipaddrs <net>  "
+        + "(or: list-ipaddrs --net <net>)";
+    }
+
     List<Map<String, Object>> records = micetroService.rangeRecords(net);
 
     if(records.isEmpty())
@@ -378,6 +454,44 @@ public class ZoneCommands
       "A", zone, micetroService.addARecords(zone, name, ip, ttl));
   }
 
+  // record types accepted by add-record (rendered in the order shown to users).
+  // SOA is intentionally excluded: each zone has exactly one, auto-managed.
+  private static final List<String> ADD_RECORD_TYPES = List.of(
+    "A", "AAAA", "MX", "CNAME", "TXT", "NS", "SRV", "PTR", "CAA",
+    "SVCB", "HTTPS", "TLSA", "SSHFP");
+
+  @Command(name = "add-record",
+           group = "Micetro Commands",
+           description = "Add a DNS record of a given type to all refs of a zone")
+  public String addRecord(
+    @Option(longName = "zone",
+            description = "DNS zone name (e.g. example.de.)",
+            required = true) String zone,
+    @Option(longName = "name",
+            description = "Record name (e.g. host.example.de.)",
+            required = true) String name,
+    @Option(longName = "type",
+            description = "Record type (A, AAAA, MX, CNAME, TXT, NS, SRV, PTR, CAA, SVCB, HTTPS, TLSA, SSHFP)",
+            required = true) String type,
+    @Option(longName = "data",
+            description = "Record data / rdata (e.g. an IP, target host or text)",
+            required = true) String data,
+    @Option(longName = "ttl",
+            description = "TTL in seconds (optional; defaults to the zone default)",
+            required = false) String ttl)
+  {
+    zone = normalizeZone(zone);
+    String recordType = type == null ? "" : type.trim().toUpperCase();
+    if( ! ADD_RECORD_TYPES.contains(recordType))
+    {
+      return "Invalid type '" + type + "'. Allowed: "
+        + String.join(", ", ADD_RECORD_TYPES);
+    }
+    log.debug("add-record: zone={}, name={}, type={}", zone, name, recordType);
+    return formatAddResult(recordType, zone,
+      micetroService.addRecords(zone, recordType, name, data, ttl));
+  }
+
   @Command(name = "remove-a",
            group = "Micetro Commands",
            description = "Remove all A DNS records (tagged l9g-cheese) for a name from all refs of a zone")
@@ -455,6 +569,12 @@ public class ZoneCommands
     StringBuilder sb = new StringBuilder();
     sb.append("Added ").append(type).append(" record to ")
       .append(result.succeeded()).append(" zone ref(s).");
+    if(result.refs() != null && !result.refs().isEmpty())
+    {
+      sb.append(System.lineSeparator())
+        .append("Created object ref(s): ")
+        .append(String.join(", ", result.refs()));
+    }
     if(!result.errors().isEmpty())
     {
       sb.append(System.lineSeparator())
@@ -486,6 +606,136 @@ public class ZoneCommands
       return "No matching records found for name '" + name + "' in zone " + zone;
     }
     return "Removed " + count + " TXT record(s).";
+  }
+
+  @Command(name = "remove-objects",
+           group = "Micetro Commands",
+           description = "Remove Micetro objects by their references (e.g. from search --show-refs)")
+  public String removeObjects(
+    CommandContext ctx,
+    @Option(longName = "obj-refs",
+            description = "Comma-separated object references (e.g. {#13-#1},{#13-#2})",
+            required = true) String objRefs,
+    @Option(longName = "dry",
+            description = "Show what would be removed without actually deleting it",
+            defaultValue = "false") boolean dry)
+  {
+    List<String> refs = parseObjRefs(objRefs);
+    if(refs.isEmpty())
+    {
+      return "Missing object reference(s). "
+        + "Usage: remove-objects --obj-refs <ref>,<ref>,...";
+    }
+    log.debug("remove-objects: refs={}, dry={}", refs, dry);
+
+    String joined = String.join(", ", refs);
+    if(dry)
+    {
+      return "[DRY-RUN] Would remove " + refs.size() + " object(s): " + joined
+        + " (no changes made).";
+    }
+
+    // remove-objects bypasses the l9g-cheese guard, so confirm interactively
+    // before deleting. Anything other than y/yes (incl. EOF) aborts.
+    String answer;
+    try
+    {
+      answer = ctx.inputReader().readInput(
+        "Remove " + refs.size() + " object(s) [" + joined + "]? This is NOT "
+        + "limited to l9g-cheese records and cannot be undone. [y/N]: ");
+    }
+    catch(Exception e)
+    {
+      log.debug("confirmation read failed", e);
+      return "Aborted: could not read confirmation.";
+    }
+    String confirm = answer == null ? "" : answer.trim();
+    if( ! confirm.equalsIgnoreCase("y") && ! confirm.equalsIgnoreCase("yes"))
+    {
+      return "Aborted. No objects were removed.";
+    }
+
+    try
+    {
+      List<Object> errors = micetroService.removeObjectsByRefs(refs);
+      if(errors.isEmpty())
+      {
+        return "Removed " + refs.size() + " object(s): " + joined;
+      }
+      return "Micetro reported " + errors.size() + " error(s) removing objects: "
+        + errors;
+    }
+    catch(MicetroApiException e)
+    {
+      return "Failed to remove objects: " + e.getMessage();
+    }
+  }
+
+  @Command(name = "enable-objects",
+           group = "Micetro Commands",
+           description = "Enable Micetro objects by their references (e.g. from search --show-refs)")
+  public String enableObjects(
+    @Option(longName = "obj-refs",
+            description = "Comma-separated object references (e.g. {#13-#1},{#13-#2})",
+            required = true) String objRefs)
+  {
+    return setObjectsEnabled(objRefs, true);
+  }
+
+  @Command(name = "disable-objects",
+           group = "Micetro Commands",
+           description = "Disable Micetro objects by their references (e.g. from search --show-refs)")
+  public String disableObjects(
+    @Option(longName = "obj-refs",
+            description = "Comma-separated object references (e.g. {#13-#1},{#13-#2})",
+            required = true) String objRefs)
+  {
+    return setObjectsEnabled(objRefs, false);
+  }
+
+  private String setObjectsEnabled(String objRefs, boolean enabled)
+  {
+    String verb = enabled ? "enable" : "disable";
+    List<String> refs = parseObjRefs(objRefs);
+    if(refs.isEmpty())
+    {
+      return "Missing object reference(s). "
+        + "Usage: " + verb + "-objects --obj-refs <ref>,<ref>,...";
+    }
+    log.debug("{}-objects: refs={}", verb, refs);
+
+    List<String> errors = micetroService.setObjectsEnabled(refs, enabled);
+    StringBuilder sb = new StringBuilder();
+    sb.append(enabled ? "Enabled " : "Disabled ")
+      .append(refs.size() - errors.size()).append(" object(s).");
+    if( ! errors.isEmpty())
+    {
+      sb.append(System.lineSeparator())
+        .append(errors.size()).append(" ref(s) failed:");
+      for(String error : errors)
+      {
+        sb.append(System.lineSeparator()).append("  ").append(error);
+      }
+    }
+    return sb.toString();
+  }
+
+  // split a comma-separated --obj-refs value into trimmed, non-empty refs
+  private static List<String> parseObjRefs(String objRefs)
+  {
+    List<String> refs = new ArrayList<>();
+    if(objRefs != null)
+    {
+      for(String r : objRefs.split(","))
+      {
+        String trimmed = r.trim();
+        if( ! trimmed.isEmpty())
+        {
+          refs.add(trimmed);
+        }
+      }
+    }
+    return refs;
   }
 
 }
