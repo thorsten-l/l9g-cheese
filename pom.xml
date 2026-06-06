@@ -1,0 +1,229 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
+  <modelVersion>4.0.0</modelVersion>
+  <parent>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-parent</artifactId>
+    <version>4.0.6</version>
+    <relativePath/> <!-- lookup parent from repository -->
+  </parent>
+
+  <groupId>l9g.app</groupId>
+  <artifactId>cheese</artifactId>
+  <version>1.1.8</version>
+  <name>L9G Cheese a Micetro CLI</name>
+  <description>L9G Cheese a Micetro CLI</description>
+  <url/>
+
+  <licenses>
+    <license>
+      <name>Apache-2.0</name>
+      <url>https://www.apache.org/licenses/LICENSE-2.0.txt</url>
+      <distribution>repo</distribution>
+      <comments>A business-friendly OSS license</comments>
+    </license>
+  </licenses>
+
+  <developers>
+    <developer>
+      <id>thorsten-l</id>
+      <name>Thorsten Ludewig</name>
+      <email>t.ludewig@gmail.com</email>
+      <url>https://github.com/thorsten-l</url>
+      <roles>
+        <role>architect</role>
+        <role>developer</role>
+      </roles>
+      <timezone>Europe/Berlin</timezone>
+      <properties>
+        <picUrl>https://gravatar.com/avatar/5668953be5f76706e39b626fb8bc28d6</picUrl>
+      </properties>
+    </developer>
+  </developers>
+  
+  <scm>
+    <connection/>
+    <developerConnection/>
+    <tag/>
+    <url/>
+  </scm>
+
+  <properties>
+    <java.version>21</java.version>
+    <spring-shell.version>4.0.2</spring-shell.version>
+    <l9g.crypto.version>1.0.5</l9g.crypto.version>
+    <build.profile>default</build.profile>
+    <exec.inheritIo>true</exec.inheritIo>
+    <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    <maven.compiler.release>21</maven.compiler.release>
+  </properties>
+
+  <dependencies>
+
+    <dependency>
+      <groupId>org.springframework.shell</groupId>
+      <artifactId>spring-shell-starter</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.shell</groupId>
+      <artifactId>spring-shell-jline</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.projectlombok</groupId>
+      <artifactId>lombok</artifactId>
+      <optional>true</optional>
+    </dependency>
+    
+    <dependency>
+      <groupId>de.l9g</groupId>
+      <artifactId>crypto-core</artifactId>
+      <version>${l9g.crypto.version}</version>
+    </dependency>
+    <dependency>
+      <groupId>de.l9g</groupId>
+      <artifactId>crypto-spring</artifactId>
+      <version>${l9g.crypto.version}</version>
+    </dependency>
+    
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-restclient</artifactId>
+    </dependency>
+
+    <!-- cache -->
+    <dependency>
+      <groupId>com.github.ben-manes.caffeine</groupId>
+      <artifactId>caffeine</artifactId>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.shell</groupId>
+      <artifactId>spring-shell-starter-test</artifactId>
+      <scope>test</scope>
+    </dependency>
+  </dependencies>
+  
+  <dependencyManagement>
+    <dependencies>
+      <dependency>
+        <groupId>org.springframework.shell</groupId>
+        <artifactId>spring-shell-dependencies</artifactId>
+        <version>${spring-shell.version}</version>
+        <type>pom</type>
+        <scope>import</scope>
+      </dependency>
+    </dependencies>
+  </dependencyManagement>
+
+  <build>
+    <finalName>${project.artifactId}</finalName>
+    
+    <resources>
+      <resource>
+        <directory>src/main/resources</directory>
+        <filtering>true</filtering>
+      </resource>
+    </resources>
+        
+    <plugins>
+      
+      <plugin>
+        <groupId>org.springframework.boot</groupId>
+        <artifactId>spring-boot-maven-plugin</artifactId>
+        <configuration>
+          <excludes>
+            <exclude>
+              <groupId>org.projectlombok</groupId>
+              <artifactId>lombok</artifactId>
+            </exclude>
+          </excludes>
+        </configuration>
+        <executions>
+          <execution>
+            <id>build-info</id>
+            <goals>
+              <goal>build-info</goal>
+            </goals>
+            <configuration>
+              <additionalProperties>
+                <java.version>${java.version}</java.version>
+                <java.version.date>${java.version.date}</java.version.date>
+                <java.vendor>${java.vendor}</java.vendor>
+                <java.vendor.url>${java.vendor.url}</java.vendor.url>
+                <java.vm.name>${java.vm.name}</java.vm.name>
+                <java.vm.vendor>${java.vm.vendor}</java.vm.vendor>
+                <java.vm.version>${java.vm.version}</java.vm.version>
+                <java.runtime.name>${java.runtime.name}</java.runtime.name>
+                <java.runtime.version>${java.runtime.version}</java.runtime.version>
+                <description>${project.description}</description>
+                <profile>${build.profile}</profile>
+                <os.arch>${os.arch}</os.arch>
+                <os.name>${os.name}</os.name>
+                <os.version>${os.version}</os.version>
+              </additionalProperties>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+            
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-compiler-plugin</artifactId>
+        <executions>
+          <execution>
+            <id>default-compile</id>
+            <phase>compile</phase>
+            <goals>
+              <goal>compile</goal>
+            </goals>
+            <configuration>
+              <annotationProcessorPaths>
+                <path>
+                  <groupId>org.projectlombok</groupId>
+                  <artifactId>lombok</artifactId>
+                </path>
+              </annotationProcessorPaths>
+            </configuration>
+          </execution>
+          <execution>
+            <id>default-testCompile</id>
+            <phase>test-compile</phase>
+            <goals>
+              <goal>testCompile</goal>
+            </goals>
+            <configuration>
+              <annotationProcessorPaths>
+                <path>
+                  <groupId>org.projectlombok</groupId>
+                  <artifactId>lombok</artifactId>
+                </path>
+              </annotationProcessorPaths>
+            </configuration>
+          </execution>
+        </executions>
+      </plugin>
+    </plugins>
+  </build>
+
+  <profiles>
+    <profile>
+      <id>native</id>
+      <build>
+        <plugins>
+          <plugin>
+            <groupId>org.graalvm.buildtools</groupId>
+            <artifactId>native-maven-plugin</artifactId>
+            <configuration>
+              <buildArgs>
+                <buildArg>--enable-native-access=ALL-UNNAMED</buildArg>
+              </buildArgs>
+            </configuration>
+          </plugin>
+        </plugins>
+      </build>
+    </profile>
+  </profiles>
+</project>

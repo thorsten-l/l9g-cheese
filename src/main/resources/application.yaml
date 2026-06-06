@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: cheese
+  profiles:
+    active: default
+  output:
+    ansi:
+      enabled: ALWAYS
+  banner:
+    location: classpath:banner.txt
+  config:
+    import: optional:file:data/config.yaml
+  shell:
+    interactive:
+      enabled: true
+    command:
+      help:
+        # Disable Spring Shell's built-in help command; HelpCommands provides a
+        # custom one that omits the dead --help/-h lines from each command page.
+        enabled: false
+      version:
+        enabled: true
+        show-build-name: true
+        show-build-version: true
+        show-build-time: true
+
+logging:
+  pattern:
+    console: "%date{yyyy-MM-dd HH:mm:ss} %magenta([%thread]) %highlight(%-5level) %logger:%line - %yellow(%msg %n)"
+  level:
+    root: INFO
+    l9g: INFO
