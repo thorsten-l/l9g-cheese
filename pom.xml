@@ -11,7 +11,7 @@
 
   <groupId>l9g.app</groupId>
   <artifactId>cheese</artifactId>
-  <version>1.3.4</version>
+  <version>1.4.0</version>
   <name>L9G Cheese a Micetro CLI</name>
   <description>L9G Cheese a Micetro CLI</description>
   <url/>

@@ -15,6 +15,7 @@
  */
 package l9g.app.cheese;
 
+import org.springframework.boot.Banner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.context.annotation.ImportRuntimeHints;
@@ -40,13 +41,26 @@ public class CheeseApplication
   /**
    * Application entry point; boots the Spring application context and, in the
    * presence of a real terminal, starts the interactive Spring Shell prompt.
+   * <p>
+   * When command-line arguments are present, the app runs in one-shot mode
+   * (see {@code ShellConfig.springShellApplicationRunner}): the banner and
+   * Spring Boot's startup info logging are suppressed so only the command's
+   * own output reaches the console. Both must be disabled here, before
+   * {@link SpringApplication#run}, because they are emitted during context
+   * startup — long before any {@code ApplicationRunner} executes.
    *
    * @param args the command-line arguments passed through to
-   *             {@link SpringApplication#run(Class, String...)}
+   *             {@link SpringApplication#run(String...)}
    */
   public static void main(String[] args)
   {
-    SpringApplication.run(CheeseApplication.class, args);
+    SpringApplication app = new SpringApplication(CheeseApplication.class);
+    if(args.length > 0)
+    {
+      app.setBannerMode(Banner.Mode.OFF);
+      app.setLogStartupInfo(false);
+    }
+    app.run(args);
   }
 
 }
